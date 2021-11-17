@@ -1,0 +1,63 @@
+
+//save function with eloquent
+public function store(CreateGraduateRequest $request) {
+        $grad_number = $this->generate_graduate_number();
+        $approved_user = auth()->user()->id;
+
+        $data = $request->validated();
+
+        // custom values for attributes
+        $data['name'] = $data['first_name'];
+        $data['roll_id'] = 2;
+        $data['is_graduate'] = 1;
+        $data['password'] = Hash::make($data['nic']);
+        $data['educational_qualification'] = '';
+        $data['gradute_number'] = $grad_number;
+        $data['approved_user'] = $approved_user;
+        $data['class'] = $data['degree_class'];
+        $data['status'] = 1;
+
+        try {
+            \DB::beginTransaction();
+
+            $user = User::create($data);
+
+            // set user id for graduate data
+            $data['user_id'] = $user->id;
+            $graduate = Graduate::create($data);
+
+            $nic_image = $request->file('nic_image')->store('public/graduate/' . $graduate->id);
+            $graduate->nic_image = str_replace('public/', '', $nic_image); // remove str_replace when public is removed
+            $nic_image_two = $request->file('nic_image_two')->store('public/graduate/' . $graduate->id);
+            $graduate->nic_image_two = str_replace('public/', '', $nic_image_two);
+
+            if ($request->hasFile('degree_cert')) {
+                $degree_cert = $request->file('degree_cert')->store('public/graduate/' . $graduate->id);
+                $graduate->degree_certificate = str_replace('public/', '', $degree_cert);
+            }
+            if ($request->hasFile('user_image')) {
+                $user_image = $request->file('user_image')->store('public/graduate/' . $graduate->id);
+                $graduate->image = str_replace('public/', '', $user_image);
+            }
+
+
+            $graduate->save();
+
+            \DB::commit();
+
+            // send login information
+            $this->send_username_pass($graduate->id);
+
+            return array('status' => 1, 'msg' => 'Graduate data insertion is sucessfull!');
+        } catch (Exception $e) {
+            \DB::rollBack();
+            $msg = $e->errorInfo[2];
+            return array('status' => 0, 'msg' => $msg);
+        }
+    }
+	
+	//update function with eloquent
+
+
+$graduate = Graduate::with(['university', 'gnDivision.dsDivision.District', 'ElectorateDivision', 'serviceCategory.sector', 'User'])->findOrFail($id);
+	
